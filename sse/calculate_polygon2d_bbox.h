@@ -27,7 +27,7 @@ void calculate_quad_bbox(const vec2& a, const vec2& b, const vec2& c, const vec2
     const __m128 maxs = _mm_max_ps( _mm_max_ps(a0, b0), _mm_max_ps(c0, d0) );
 
     // [MinX, MinY, MaxX, MaxY]
-    const __m128 blended = _mm_blend_ps(mins, maxs, 0b1100);
+    const __m128 blended = _mm_movelh_ps(mins, maxs);
 
     _mm_store_ps((float*)out_bbox, blended);
 }
@@ -45,7 +45,7 @@ void calculate_tri_bbox(const vec2& a, const vec2& b, const vec2& c, bbox* out_b
     const __m128 maxs = _mm_max_ps( _mm_max_ps(a0, b0), c0 );
 
     // [MinX, MinY, MaxX, MaxY]
-    const __m128 blended = _mm_blend_ps(mins, maxs, 0b1100);
+    const __m128 blended = _mm_movelh_ps(mins, maxs);
 
     _mm_store_ps((float*)out_bbox, blended);
 }
