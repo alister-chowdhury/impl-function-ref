@@ -27,8 +27,8 @@ void pack4_vec2s(const vec2* vec2s, packed4_vec2* out) {
     const __m128 x = _mm_shuffle_ps( row_1, row_2, 0b10001000);
     const __m128 y = _mm_shuffle_ps( row_1, row_2, 0b11011101);
 
-    _mm_store_ps((float*)out, x);
-    _mm_store_ps((float*)&out[1], y);
+    _mm_store_ps((float*)&out->x, x);
+    _mm_store_ps((float*)&out->y, y);
 }
 
 
