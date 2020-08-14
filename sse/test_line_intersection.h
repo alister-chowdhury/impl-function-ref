@@ -25,7 +25,7 @@ struct alignas(16) line {
 };
 
 
-// Need to test this properly
+// Need to test this properly (should also be possible to do a 4x4 test, returning a uint64)
 inline
 uint8_t test_intersection_4(const line& ab, const packed_lines& cd) {
 
