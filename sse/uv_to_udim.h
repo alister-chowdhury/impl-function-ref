@@ -40,7 +40,7 @@ void uv_to_udim_ids(const vec2* src, vec2i* dst, const uint32_t count) {
 
         __m128 uv = _mm_castpd_ps(_mm_load_sd((const double*)&src[written]));
         const __m128 udim = _mm_floor_ps(uv);
-        _mm_storeu_si64((void*)&dst[written], _mm_cvtps_epi32( udim ));
+        _mm_storel_epi64((__m128i*)&dst[written], _mm_cvtps_epi32( udim ));
 
     }
 
@@ -85,7 +85,7 @@ bool uvs_to_udim_ids_and_test_for_same_udim(const vec2* src, vec2i* dst, const u
 
         __m128 uv = _mm_castpd_ps(_mm_load_sd((const double*)&src[written]));
         const __m128 udim = _mm_floor_ps(uv);
-        _mm_storeu_si64((void*)&dst[written], _mm_cvtps_epi32( udim ));
+        _mm_storel_epi64((__m128i*)&dst[written], _mm_cvtps_epi32( udim ));
 
         same_flag = _mm_and_ps( same_flag, _mm_cmpeq_ps( first_udim, udim ) );
     }
