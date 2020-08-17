@@ -52,7 +52,7 @@ bool uvs_to_udim_ids_and_test_for_same_udim(const vec2* src, vec2i* dst, const u
 
     // If there is nothing to stream, really there is a case for both the udims all being
     // the same, and them not being the same.
-    if( !count ) return false;
+    if( !count ) return true;
 
     uint32_t written = 0;
 
