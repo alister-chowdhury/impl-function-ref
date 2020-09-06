@@ -32,7 +32,7 @@ uint64_t fast_128bit_input_hash(const void* data) {
 
     const uint64_t* ptr = (const uint64_t*)data;
     const uint64_t A = 0xe7037ed1a0b428dbULL ^ ptr[0];
-    const uint64_t B = 0xa0761d6478bd642fULL ^ ptr[1];;
+    const uint64_t B = 0xa0761d6478bd642fULL ^ ptr[1];
 
     // gcc / clang
     #ifdef __SIZEOF_INT128__
