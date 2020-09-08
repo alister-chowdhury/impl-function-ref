@@ -1,7 +1,16 @@
 #pragma once
 
 #include <cstdint>
-#include <x86intrin.h>
+
+#if defined(_MSC_VER) && defined(_M_X64)
+    #include <intrin.h>
+
+#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+    #include <x86intrin.h>
+
+#else
+    #error "Only really intended for x64 gcc/clang/msc"
+#endif
 
 
 // Note: All input floats assumed to be in range of [0, 1]
