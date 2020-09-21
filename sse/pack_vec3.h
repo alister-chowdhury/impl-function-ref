@@ -59,6 +59,38 @@ void pack4_vec3s(const vec3* vec3s, packed4_vec3* out) {
 
 
 inline
+void unpack_vec3s(vec3* vec3s, const packed4_vec3* ins) {
+
+        // Ax Bx Cx Dx
+        // Ay By Cy Dy
+        // Az Bz Cz Dz
+        const __m128 row_1 = _mm_loadu_ps((const float*)&ins->x);
+        const __m128 row_2 = _mm_loadu_ps((const float*)&ins->y);
+        const __m128 row_3 = _mm_loadu_ps((const float*)&ins->z);
+
+        // Ax Dx Az Dz
+        // By Ay Cx Bx
+        // Cz Bz Dy Cy
+        const __m128 R0 = _mm_shuffle_ps(row_1, row_3, 0b11001100);
+        const __m128 R1 = _mm_shuffle_ps(row_2, row_1, 0b01100001);
+        const __m128 R2 = _mm_shuffle_ps(row_3, row_2, 0b10110110);
+
+        // Ax, Ay, Az, Bx
+        // By, Bz, Cx, Cy
+        // Cz, Dx, Dy, Dz
+        const __m128 out_0 = _mm_blend_ps(R0, R1, 0b1010);
+        const __m128 out_1 = _mm_blend_ps(R1, R2, 0b1010);
+        const __m128 out_2 = _mm_blend_ps(R2, R0, 0b1010);
+
+        float* vec3_f = (float*)vec3s;
+        _mm_store_ps( vec3_f, out_0);
+        _mm_store_ps( vec3_f + 4, out_1);
+        _mm_store_ps( vec3_f + 8, out_2);
+}
+
+
+inline
 void pack4_vec3s_inplace(vec3* vec3s) {
     pack4_vec3s(vec3s, (packed4_vec3*)vec3s);
 }
+
