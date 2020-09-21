@@ -31,26 +31,23 @@ void pack4_vec3s(const vec3* vec3s, packed4_vec3* out) {
     // By, Bz, Cx, Cy
     // Cz, Dx, Dy, Dz
     const float* vec3_f = (const float*)vec3s;
-    const __m128 row_1 = _mm_loadu_ps( vec3_f );
-    const __m128 row_2 = _mm_loadu_ps( &vec3_f[4] );
-    const __m128 row_3 = _mm_loadu_ps( &vec3_f[8] );
+    const __m128 row_1  = _mm_loadu_ps(vec3_f);
+    const __m128 row_2  = _mm_loadu_ps(&vec3_f[4]);
+    const __m128 row_3  = _mm_loadu_ps(&vec3_f[8]);
 
-    // Ax Ay Cx Cy
-    // By Bz Dy Dz
-    // Az Bx Cz Dx
-    const __m128 R0 = _mm_blend_ps(row_1, row_2, 0b1100);
-    const __m128 R1 = _mm_blend_ps(row_2, row_3, 0b1100);
-    const __m128 R2 = _mm_shuffle_ps(row_1, row_3, 0b01001110);
-
-    // By Ay Dy Cy
-    const __m128 R3 = _mm_blend_ps(R1, R0, 0b1010);
+    // Ax Bx Cz Dz
+    // Bz By Az Ay
+    // Dy Dx Cy Cx
+    const __m128 R0 = _mm_shuffle_ps(row_1, row_3, 0b11001100);
+    const __m128 R1 = _mm_shuffle_ps(row_2, row_1, 0b01100001);
+    const __m128 R2 = _mm_shuffle_ps(row_3, row_2, 0b10110110);
 
     // Ax Bx Cx Dx
     // Ay By Cy Dy
     // Az Bz Cz Dz
-    const __m128 x = _mm_blend_ps(R0, R2, 0b1010);
-    const __m128 y = _mm_shuffle_ps(R3, R3, 0b10110001);
-    const __m128 z = _mm_blend_ps(R2, R1, 0b1010);
+    const __m128 x = _mm_shuffle_ps(R0, R2, 0b01110100);
+    const __m128 y = _mm_shuffle_ps(R1, R2, 0b00100111);
+    const __m128 z = _mm_shuffle_ps(R1, R0, 0b11100010);
 
     _mm_store_ps((float*)&out->x, x);
     _mm_store_ps((float*)&out->y, y);
