@@ -56,3 +56,39 @@ uint64_t fast_128bit_input_hash(const void* data) {
     #endif
 
 }
+
+
+// The below two functions seem to interchange between which one performs better
+// when I've run tests, both are faster than the above.
+// The AES hasher is probably the more prefered one, due to it hashing a bit better
+// as long as you're not in a tight loop and batch hashing 128bits, as something
+// about the crc32 one seems to handle that a bit better.
+
+
+#ifdef __SSE4_2__ 
+
+// Faster than above, but doesn't hash as well, but should be for something
+// like a generating bucket ids.
+inline
+uint64_t fast_128bit_input_hash_2(const void* data) {
+    uint64_t r0 = _mm_crc32_u64(0, P[0]);
+    uint64_t r1 = _mm_crc32_u64(r0, P[1]);
+    return (r1 | (r0 << 32));
+
+#endif
+
+
+#ifdef __AES__
+
+// Requires, AES support, which I think most CPUs these days have?
+inline
+uint64_t fast_128bit_input_hash_3(const void* data) {
+
+    __m128i value = _mm_lddqu_si128((const __m128i*)data);
+    __m128i s0 = _mm_aesenc_si128(value, value);
+    __m128i s1 = _mm_aesdec_si128(s0, value);
+    return _mm_extract_epi64(s1, 0);
+
+}
+
+#endif
