@@ -5,7 +5,14 @@
 #if defined(_MSC_VER) && defined(_M_X64)
     #include <intrin.h>
     #pragma intrinsic(_umul128)
+
+#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+    #include <x86intrin.h>
+
+#else
+    #error "Only really intended for x64 gcc/clang/msc"
 #endif
+
 
 
 // Very fast hash for 128bits of data, basically
@@ -71,9 +78,11 @@ uint64_t fast_128bit_input_hash(const void* data) {
 // like a generating bucket ids.
 inline
 uint64_t fast_128bit_input_hash_2(const void* data) {
+    const uint64_t* P = (const uint64_t*)data;
     uint64_t r0 = _mm_crc32_u64(0, P[0]);
     uint64_t r1 = _mm_crc32_u64(r0, P[1]);
     return (r1 | (r0 << 32));
+}
 
 #endif
 
