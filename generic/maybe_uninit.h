@@ -20,7 +20,7 @@
  *      if(original.is_invalid())
  *      {
  *          out.init(original)->fix();
- *          out.get()->do_something_else();
+ *          out->do_something_else();
  *      }
  *  }
  *
@@ -28,7 +28,35 @@
 template <typename T>
 struct maybe_uninit
 {
-    maybe_uninit() = default;
+    constexpr maybe_uninit() = default;
+
+    constexpr maybe_uninit(const maybe_uninit& other) {
+        if(other.m_initialized) {
+            init(*other);
+        }
+    }
+
+    constexpr maybe_uninit(maybe_uninit&& other) {
+        if(other.m_initialized) {
+            init(std::move(*other));
+        }
+    }
+
+    constexpr maybe_uninit& operator=(const maybe_uninit& other) {
+        if(other.m_initialized) {
+            if(m_initialized) {
+                *get() = *other;
+            }
+            else {
+                init(*other);
+            }
+        }
+        else {
+            uninit();
+        }
+        return *this;
+    }
+
     ~maybe_uninit() {
         if (m_initialized) {
             get()->~T();
@@ -36,17 +64,12 @@ struct maybe_uninit
         }
     }
 
-    // For now, not supporting move / copy semantics
-    maybe_uninit(const maybe_uninit& other) = delete;
-    maybe_uninit(maybe_uninit&& other) = delete;
-    maybe_uninit& operator=(const maybe_uninit& other) = delete;
-
     /**
      * @brief Initialize the underlying type.
      * @details Repeated calls replaces the underlying object.
      */
     template <typename... ArgTs>
-    T* init(ArgTs&&... args) {
+    constexpr T* init(ArgTs&&... args) {
         if (!m_initialized) {
             m_initialized = true;
         }
@@ -60,24 +83,58 @@ struct maybe_uninit
     }
 
     /**
+     * @brief Uninitialize the underlying type.
+     */
+    constexpr void uninit() {
+        if(m_initialized) {
+            get()->~T();
+            m_initialized = false;
+        }
+    }
+
+    /**
+     * @brief Test if the underlying object has been initialized.
+     */
+    constexpr bool initialized() const {
+        return m_initialized;
+    }
+
+    /**
      * @brief Get a pointer to an instance of the underlying type.
      * @details If uninitialized a nullptr is returned.
      */
-    T* get() {
+    constexpr T* get() {
         if (!m_initialized) {
             return nullptr;
         }
         return (T*)&m_buffer;
     }
 
-    const T* get() const {
+    constexpr const T* get() const {
         if (!m_initialized) {
             return nullptr;
         }
         return (const T*)&m_buffer;
     }
 
+    constexpr T& operator*() {
+        return *get();
+    }
+
+    constexpr const T& operator*() const {
+        return *get();
+    }
+
+    constexpr T* operator->() {
+        return get();
+    }
+
+    constexpr T* operator->() const {
+        return get();
+    }
+
   private:
     alignas(alignof(T)) char m_buffer[sizeof(T)];
     char m_initialized = false;
 };
+
