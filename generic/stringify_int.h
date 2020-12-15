@@ -101,3 +101,37 @@ struct stringify_int {
     }
 
 };
+
+
+template<typename T>
+__attribute__((always_inline)) inline
+bool parse_int(const char* c, T& out)
+{
+    bool negate = false;
+
+    if(std::is_signed<T>())
+    {
+        if(*c == '-')
+        {
+            negate = true;
+            ++c;
+        }
+    }
+
+    T rvalue = 0;
+    while(unsigned char c0 = *c++)
+    {
+        rvalue *= 10;
+        c0 -= '0';
+        if(__builtin_expect(!!(c0 > 10), 0)) { return false; }
+        rvalue += c0;
+    }
+
+    if(negate)
+    {
+        rvalue = -rvalue;
+    }
+
+    out = rvalue;
+    return true;
+}
