@@ -135,3 +135,14 @@ bool parse_int(const char* c, T& out)
     out = rvalue;
     return true;
 }
+
+
+__attribute__((always_inline)) inline
+uint8_t f_nibble_from_hex(char x) {
+    uint8_t y = x - '0';
+    y &= 0b11111;
+    uint8_t sh = (y >> 4) & 1;
+    y -= sh * 8;
+    y += sh;
+    return y;
+}
