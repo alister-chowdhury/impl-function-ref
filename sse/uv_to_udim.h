@@ -103,3 +103,11 @@ bool uvs_to_udim_ids_and_test_for_same_udim(const vec2* src, vec2i* dst, const u
     // All udims ended up being the same
     return ( _mm_movemask_ps( same_flag ) == 0b1111 );
 }
+
+
+// returns [uf32, vf32] packed (for use in a set etc)
+inline
+uint64_t uv_to_packed_udim(const vec2* uv) {
+    __m128 udim = _mm_floor_ps(_mm_castpd_ps(_mm_load_sd((const double*)uv)));
+    return (uint64_t)_mm_cvtsi128_si64(_mm_castps_si128(udim));
+}
