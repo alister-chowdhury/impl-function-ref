@@ -2,6 +2,9 @@
 // I havne't tested this works yet
 // I haven't benchmarked this yet
 
+// Turns out no, for a small number of udims, std::set seems to be best:
+// https://quick-bench.com/q/HOZz184XQWSUp7uK46KgHgkpQXk
+
 
 #include <algorithm>
 #include <cstdint>

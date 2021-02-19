@@ -1,5 +1,9 @@
 #pragma once
 
+
+// NB: This doesn't generate a nice switch block!!!!!!!
+
+
 // This contains helper functions to perform switch-like operations using templated variadic integers.
 //
 // * variadic_int_switch        - Template takes an explicit list of 'case' values.
