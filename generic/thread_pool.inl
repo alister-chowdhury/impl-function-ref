@@ -40,6 +40,7 @@
 
 
 using taskhandle_t = size_t;
+const static taskhandle_t INVALID_TASK_HANDLE = ~taskhandle_t(0);
 
 
 class TaskPool {
@@ -203,7 +204,7 @@ public:
         std::atomic<int> subTaskCount { 0 };
 
         // So we don't nessacarily want to just spawn a bunch of tasks
-        // especially if it #1 the pool is already busy and won't pick them
+        // especially if #1 the pool is already busy and won't pick them
         // up, and #2 if the actual work itself is really cheap.
         // Rather, we enqueue a task, that itself enqueues another task
         // and so on and so forth until either the threads are busy
@@ -222,11 +223,12 @@ public:
                     auto self
             ) -> void
             {
+                taskhandle_t childHandle = INVALID_TASK_HANDLE;
                 // Spawn a new task
                 if(subTaskCount < std::min(int(end - it), maxThreadCount))
                 {
                     ++subTaskCount;
-                    tp->enqueueTask([&]{
+                    childHandle = tp->enqueueTask([&]{
                         self(
                             tp,
                             std::forward<F>(func),
@@ -243,7 +245,11 @@ public:
                 {
                     func(c);
                 }
-                --subTaskCount;
+
+                if(childHandle != INVALID_TASK_HANDLE)
+                {
+                    tp->waitForTask(childHandle);
+                }
             };
             worker(
                 this,
@@ -257,8 +263,7 @@ public:
         };
 
         ++subTaskCount;
-        enqueueTask([&]{processTasks();});
-        runTasksUntil([&]{ return subTaskCount == 0; });
+        waitForTask(enqueueTask([&]{processTasks();}));
     }
 
     template<typename... Fs>
@@ -433,6 +438,7 @@ bool TaskPool::runNextTask()
 
 bool TaskPool::hasTaskFinished(const taskhandle_t taskId) const
 {
+    if(taskId == INVALID_TASK_HANDLE) { return true; }
     std::shared_lock<shared_mutex> guard(m_unrunIdsLock);
     return m_unrunIds.find(taskId) == m_unrunIds.end();
 }
