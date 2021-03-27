@@ -24,3 +24,25 @@ unsigned int bsf(unsigned int m)
 #endif
 
 }
+
+
+inline
+unsigned long long bsf(unsigned long long m)
+{
+
+#if defined(__GNUC__) || defined(__CLANG__)
+    return __builtin_ctzl(m);
+
+#elif defined(_MSC_VER)
+    unsigned long long v = 0;
+    _BitScanForward64(&v, (unsigned long)m);
+    return v;
+
+#else
+    unsigned long long value = 0;
+    while (m >>= 1) ++value;
+    return value;
+
+#endif
+
+}

@@ -21,9 +21,15 @@
 template <typename CallbackT>
 inline uint64_t measure_cycles(CallbackT callback) {
 
+#ifdef _MSC_VER
+    int64_t first = __rdtsc();
+    callback();
+    return __rdtsc() - first;
+#else
     int64_t first = _rdtsc();
     callback();
     return _rdtsc() - first;
+#endif
 
 }
 
