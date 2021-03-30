@@ -101,30 +101,51 @@ template <typename... Ts>
 struct cmp_eq_impl {
 
 private:
-    // all_true helper
-    template <typename...>
-    struct all_true_impl {
-        CONSTEXPR_ALWAYS_INLINE static bool call(...) { return true; }
+    // all_equal helper
+
+    template <bool light_block, typename...>
+    struct all_equal_impl {
+        CONSTEXPR_ALWAYS_INLINE static bool call() { return true; }
     };
-    template <typename BoolT, typename... NextBoolsT>
-    struct all_true_impl<BoolT, NextBoolsT...> {
-        CONSTEXPR_ALWAYS_INLINE static bool call(const BoolT current, const NextBoolsT... nexts) {
-            return current & all_true_impl<NextBoolsT...>::call(nexts...);
+
+    // Light all_equal compare
+    template <typename T, typename... Nexts>
+    struct all_equal_impl<true, T, Nexts...> {
+        CONSTEXPR_ALWAYS_INLINE static bool call(
+                const T& a, const Nexts&... nexts_a,
+                const T& b, const Nexts&... nexts_b
+        ) {
+            return (
+                cmp_eq_one_impl<T>::cmp_eq_light(a, b)
+                && all_equal_impl<true, Nexts...>::call(nexts_a..., nexts_b...)
+            );
         }
     };
-    template <typename... NextBoolsT>
-    CONSTEXPR_ALWAYS_INLINE static bool all_true(const NextBoolsT... bools) {
-        return all_true_impl<NextBoolsT...>::call(bools...);
-    }
 
+    // Normal all_equal compare
+    template <typename T, typename... Nexts>
+    struct all_equal_impl<false, T, Nexts...> {
+        CONSTEXPR_ALWAYS_INLINE static bool call(
+                const T& a, const Nexts&... nexts_a,
+                const T& b, const Nexts&... nexts_b
+        ) {
+            return (
+                cmp_eq_one_impl<T>::cmp_eq_normal(a, b)
+                && all_equal_impl<false, Nexts...>::call(nexts_a..., nexts_b...)
+            );
+        }
+    };
+
+    template<bool light_block>
+    CONSTEXPR_ALWAYS_INLINE static bool all_equal(const Ts&... a_values, const Ts&... b_values) {
+        return all_equal_impl<light_block, Ts...>::call(a_values..., b_values...);
+    }
 
 public:
     CONSTEXPR_ALWAYS_INLINE static bool call(const Ts&... a_values, const Ts&... b_values) {
         return (
-            // First do light compares
-            all_true(cmp_eq_one_impl<Ts>::cmp_eq_light(a_values, b_values)...)
-            // // Then do normal compares
-            && all_true(cmp_eq_one_impl<Ts>::cmp_eq_normal(a_values, b_values)...)
+            all_equal<true>(a_values..., b_values...)
+            && all_equal<false>(a_values..., b_values...)
         );
     }
 };
@@ -166,7 +187,7 @@ public:
  * 
  */
 template <typename ClassT, typename... ValueTs>
-constexpr bool test_members_are_equal(
+CONSTEXPR_ALWAYS_INLINE bool test_members_are_equal(
     const ClassT& first,
     const ClassT& second,
     ValueTs ClassT::*... members
