@@ -184,19 +184,19 @@ public:
     template<typename It, typename F>
     void parallel_for(It begin, It end, F&& f)
     {
-        int count = end - begin;
-        if(count <= 1)
+        if(end <= begin)
         {
-            switch(count)
+            if(begin == end)
             {
-                case -1:
-                case 1: f(begin);
-                case 0: return;
-                default:
-                    std::swap(begin, end);
-                    count = -count;
-                    break;
+                return;
             }
+            std::swap(begin, end);
+        }
+
+        if(end - begin == 1)
+        {
+            f(begin);
+            return;
         }
 
         const int maxThreadCount = (int)m_maxThreadCount;
