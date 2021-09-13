@@ -331,6 +331,12 @@ WYHASH_CONSTEXPR uint64_t wyhash(const char *key, size_t len, uint64_t seed = 0,
     return wymix<mum32, condom>(secret[1] ^ len, wymix<mum32, condom>(a ^ secret[1], b ^ seed));
 }
 
+template<bool mum32=false, int condom=1>
+WYHASH_CONSTEXPR uint64_t wy2u0k(uint64_t A, uint64_t B)
+{
+    wymum<mum32, condom>(&A, &B);
+    return B;
+}
 
 // Non constexpr vesion
 template<bool mum32=false, int condom=1>
