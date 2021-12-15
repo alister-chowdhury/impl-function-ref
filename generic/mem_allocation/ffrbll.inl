@@ -396,7 +396,9 @@ FFRbSa::AllocatorToken FFRbSa::allocate(u32 size, u32 alignment)
         // Partial consumption
         else
         {
-            u32 alignmentPadding = (found->offset - 1) & (alignment - 1);
+            // Always assuming alignment is a power of 2
+            u32 alignedOffset = ((found->offset - 1) | (alignment - 1)) + 1;
+            u32 alignmentPadding = alignedOffset - found->offset;
 
             // Simple
             if(alignmentPadding == 0)
