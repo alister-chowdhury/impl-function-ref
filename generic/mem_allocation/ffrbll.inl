@@ -73,19 +73,6 @@ using u64 = uint64_t;
 #endif
 
 
-// This specicially can be overriden
-#ifndef LITTLE_ENDIAN
-  #if defined(_WIN32) || defined(__LITTLE_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-    #define LITTLE_ENDIAN 1
-  #elif defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    #define LITTLE_ENDIAN 0
-  #else
-    #warning could not determine endianness! Falling back to little endian.
-    #define LITTLE_ENDIAN 1
-  #endif
-#endif
-
-
 template<typename T, u32 brickCount=64>
 class BrickBasedPool
 {
@@ -174,8 +161,8 @@ public:
     struct AllocatorToken
     {
         u32 offset;
-        u32 size:31;
-        u32 isValid:1;
+        u32 size;
+        u8  isValid;
     };
 
     FFRbSuballocator();
@@ -199,23 +186,11 @@ private:
     {
         u32 offset;
         u32 size;
-
-        // RBTree based data
-        union
-        {
-            // Composite data, mainly so we can simplify the flip / set instructions
-            // GCC seems to do an excessively large amount of when it comes
-            // to doing colour ^= 1, so we need to target colourMaxSize instead
-            struct
-            {
-                // 0 = black, 1 = red
-                u32 colour:1;
-                // Max of all descending nodes
-                u32 maxSize:31;
-            };
-
-            u32 colourMaxSize;
-        };
+        // Max of all descending nodes
+        u32 maxSize;
+        // 0 = black, 1 = red
+        u8 colour;
+        u8 unused[3];
 
         // Parent node
         FFRbNode* parent;
@@ -234,20 +209,7 @@ private:
 
         FFRbNode() { reset(); }
 
-#if LITTLE_ENDIAN
-        FORCEINLINE void flipColour()                       { colourMaxSize ^= 1; }
-        FORCEINLINE void setBlack()                         { colourMaxSize &= 0xfffffffe; }
-        FORCEINLINE void setRed()                           { colourMaxSize |= 1; }
-        FORCEINLINE void copyColour(const FFRbNode* other)
-        {
-            if(other) { colourMaxSize = (colourMaxSize & 0xfffffffe) | (other->colourMaxSize & 1); }
-            else { setBlack(); }
-        }
-
-#else
-        // I can't justifiably say I've tested this on big endian and have not
-        // observed any sort of improovement in instructions.
-        FORCEINLINE void flipColour()                       { color ^= 1; }
+        FORCEINLINE void flipColour()                       { colour ^= 1; }
         FORCEINLINE void setBlack()                         { colour = 0; }
         FORCEINLINE void setRed()                           { colour = 1; }
         FORCEINLINE void copyColour(const FFRbNode* other)
@@ -255,8 +217,6 @@ private:
             if(other) { colour = other->colour; }
             else { setBlack(); }
         }
-
-#endif // LITTLE_ENDIAN
 
         FORCEINLINE void reset()
         {
@@ -547,8 +507,10 @@ FFRbSa::FFRbNode* FFRbSa::allocateFind(FFRbSa::FFRbNode* nd, u32 size, u32 align
 
     if(nd->size >= size)
     {
-        u32 alignmentPadding = (nd->offset - 1) & (alignment - 1);
-        if(nd->size + (size + alignmentPadding))
+        // Always assuming alignment is a power of 2
+        u32 alignedOffset = ((nd->offset - 1) | (alignment - 1)) + 1;
+        u32 alignmentPadding = alignedOffset - nd->offset;
+        if(nd->size >= (size + alignmentPadding))
         {
             return nd;
         }
