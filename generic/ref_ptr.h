@@ -70,6 +70,21 @@
 
 
 
+// Convience class to use with RefPtrTracking to return items to pools etc.
+class RefPtrDestroySelfDeleter
+{
+public:
+    template<typename T>
+    FORCEINLINE void operator()(T* item)
+    {
+        item->destroySelf();
+    }
+};
+
+
+namespace detail
+{
+
 template<bool threadSafe=false>
 struct RefPtrCounter
 {
@@ -82,11 +97,14 @@ protected:
 };
 
 
+} // namespace detail
+
+
 template <typename T> class RefPtr;
 
 
 template<typename T, typename Deleter=std::default_delete<T>, bool threadSafe=false>
-class RefPtrTracking : public RefPtrCounter<threadSafe>
+class RefPtrTracking : public detail::RefPtrCounter<threadSafe>
 {
 
 public:
@@ -116,15 +134,20 @@ protected:
 
     FORCEINLINE void incReference()
     {
-        RefPtrCounter<threadSafe>::incReference();
+        detail::RefPtrCounter<threadSafe>::incReference();
     }
 
     void decReference()
     {
-        if(RefPtrCounter<threadSafe>::decReference())
+        if(detail::RefPtrCounter<threadSafe>::decReference())
         {
             deleteSelf();
         }
+    }
+
+    uint64_t getCounter() const
+    {
+        return detail::RefPtrCounter<threadSafe>::counter;
     }
 
     NOINLINE void deleteSelf()
@@ -142,8 +165,8 @@ template<typename T>
 class RefPtr
 {
     const static bool hasRefTrackingCounter = (
-        std::is_base_of<RefPtrCounter<false>, T>::value
-        || std::is_base_of<RefPtrCounter<true>, T>::value
+        std::is_base_of<detail::RefPtrCounter<false>, T>::value
+        || std::is_base_of<detail::RefPtrCounter<true>, T>::value
     );
     static_assert(
         hasRefTrackingCounter,
@@ -158,7 +181,7 @@ private:
         const static bool hasMatchingTrackingAddress = T::template matchingTrackingPtrAddress<U>;
         const static bool value = (
             hasMatchingTrackingAddress
-            && std::is_base_of<U, T>::value
+            && std::is_base_of<T, U>::value
         );
     };
 
@@ -178,34 +201,81 @@ public:
         }
     }
 
-    RefPtr() = default;
+    RefPtr() {}
+
+    RefPtr(const RefPtr& inPtr)
+    : ptr(inPtr.ptr)
+    {
+        if(ptr)
+        {
+            ptr->incReference();
+        }
+    }
+
+    RefPtr(RefPtr&& inPtr)
+    : ptr(inPtr.ptr)
+    {
+        inPtr.ptr = nullptr;
+    }
 
     template<typename U, std::enable_if_t<can_cast_to<U>::value, bool> = true>
     RefPtr(U* inPtr)
+    : ptr(inPtr)
     {
-        if(inPtr)
+        if(ptr)
         {
-            inPtr->incReference();
-            ptr = inPtr;
+            ptr->incReference();
         }
     }
 
     template<typename U, std::enable_if_t<can_cast_to<U>::value, bool> = true>
     RefPtr(const RefPtr<U>& inPtr)
+    : ptr(inPtr.ptr)
     {
-        T* newPtr = static_cast<T*>(inPtr.ptr);
-        if(newPtr)
+        if(ptr)
         {
-            newPtr->incReference();
-            ptr = newPtr;
+            ptr->incReference();
         }
     }
 
     template<typename U, std::enable_if_t<can_cast_to<U>::value, bool> = true>
-    RefPtr(RefPtr<U>&& inPtr)
+    explicit RefPtr(RefPtr<U>&& inPtr)
+    : ptr(inPtr.ptr)
     {
-        ptr = static_cast<T*>(inPtr.ptr);
         inPtr.ptr = nullptr;
+    }
+
+    template<typename U, std::enable_if_t<can_cast_to<U>::value, bool> = true>
+    RefPtr& operator= (U* newPtr)
+    {
+        T* oldPtr = ptr;
+        if(newPtr)
+        {
+            newPtr->incReference();
+        }
+        ptr = newPtr;
+        if(oldPtr)
+        {
+            oldPtr->decReference();
+        }
+        return *this;
+    }
+
+
+    RefPtr& operator= (const RefPtr& inPtr)
+    {
+        T* oldPtr = ptr;
+        T* newPtr = inPtr.ptr;
+        if(newPtr)
+        {
+            newPtr->incReference();
+        }
+        ptr = newPtr;
+        if(oldPtr)
+        {
+            oldPtr->decReference();
+        }
+        return *this;
     }
 
     FORCEINLINE operator bool() const { return (bool)ptr; }
@@ -218,6 +288,24 @@ public:
     FORCEINLINE const T* get() const { return ptr; }
     FORCEINLINE T* get() { return ptr; }
 
+    FORCEINLINE uint64_t count() const
+    {
+        if(ptr)
+        {
+            return ptr->getCounter();
+        }
+        return 0;
+    }
+
+    void release()
+    {
+        if(ptr)
+        {
+            ptr->decReference();
+            ptr = nullptr;
+        }
+    }
+
     FORCEINLINE bool operator == (const RefPtr<T>& other) const { return ptr == other.ptr; }
     FORCEINLINE bool operator != (const RefPtr<T>& other) const { return ptr != other.ptr; }
     FORCEINLINE bool operator <= (const RefPtr<T>& other) const { return ptr <= other.ptr; }
@@ -227,6 +315,9 @@ public:
     friend FORCEINLINE auto hash(const RefPtr<T>& value) { return std::hash<T*>{}(value.ptr); }
 
 private:
+    template<typename U>
+    friend class RefPtr;
+
     T*  ptr = nullptr;
 };
 
