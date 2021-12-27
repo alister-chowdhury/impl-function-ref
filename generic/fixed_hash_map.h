@@ -85,7 +85,8 @@
 // And for runtime dependant sizes:
 //      FixedHashMap<Type, std::unique_ptr<char[]> map1 = createFixedHashMap<Type>(begin, end);
 //
-//      // No dynamic createFixedHashMapWithDefaultValue yet, but should be trivial to implement.
+//      container<uint64_t> keys { ... };
+//      FixedHashMap<Type, std::unique_ptr<char[]> emptyMap1 = createEmptyFixedHashMap(keys.begin(), keys.end(), 0);
 //
 //      // Dump to file
 //      writeToFile(filepath, map1.data(), map1.byteSize());
@@ -242,6 +243,20 @@ template<typename T,
 using TypedFixedStorage = FixedStorage<itemCount, sizeof(T), bucketCount>;
 
 
+struct DefaultMapAdapter
+{
+    CONSTEXPRINLINE auto getKey(const auto iter) const { return iter->first; }
+    CONSTEXPRINLINE auto getValue(const auto iter) const { return iter->second; }
+};
+
+template<typename T>
+struct DefaultValueAdapter
+{
+    T value;
+    CONSTEXPRINLINE auto getKey(const auto iter) const { return *iter; }
+    CONSTEXPRINLINE auto getValue(const auto iter) const { return value; }
+};
+
 }  // namespace fhmbuilding
 
 
@@ -277,8 +292,8 @@ CONSTEXPRINLINE bool validateTypeInConstexpr()
            // Using a static_assert will often evaluate prematurely, so we opt to throw an exception here
             // in its place (which can only happen at compile time).
             throw "This type cannot be converted in a constexpr context, this is likely due to implicit padding.";
+            return false;
         }
-        return false;
     }
     return true;
 }
@@ -884,8 +899,8 @@ CONSTEXPRINLINE FixedHashMap<T, fhmbuilding::TypedFixedStorage<T, itemCount>> cr
 }
 
 // Runtime specific hash-map generation, where a fixed data size cannot be used
-template<typename T, uint32_t maxStackProtection=4096, typename IteratorType=void, typename AllocateFuncType=void>
-CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, AllocateFuncType&& allocateFunc)
+template<typename T, uint32_t maxStackProtection=4096, typename Adapter=fhmbuilding::DefaultMapAdapter, typename IteratorType=void, typename AllocateFuncType=void>
+CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, AllocateFuncType&& allocateFunc, Adapter adapter={})
 {
     using Storage = decltype(std::declval<decltype(allocateFunc)>()(1));
     const uint32_t itemCount = std::distance(begin, end);
@@ -907,7 +922,7 @@ CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, Al
     // Calculate the bucket counts
     for(auto iter=begin; iter!=end; ++iter)
     {
-        const uint64_t hash = iter->first;
+        const uint64_t hash = adapter.getKey(iter);
         const uint64_t bucketId = hash & (bucketCount - 1);
 
         Byte* bucketOffset = &result.storage[
@@ -959,7 +974,7 @@ CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, Al
     }
     for(auto iter=begin; iter!=end; ++iter)
     {
-        const uint64_t hash = iter->first;
+        const uint64_t hash = adapter.getKey(iter);
         const uint64_t bucketId = hash & (bucketCount - 1);
         Byte* bucketOffset = &result.storage[
             sizeof(FhmMapHeader)
@@ -978,7 +993,7 @@ CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, Al
         );
 
         fhmio::storeObject(&result.storage[hashWriteOffset],  hash);
-        fhmio::storeObject(&result.storage[valueWriteOffset], iter->second);
+        fhmio::storeObject(&result.storage[valueWriteOffset], adapter.getValue(iter));
         ++writtenEntries[bucketId];
     }
 
@@ -999,6 +1014,22 @@ constexpr FixedHashMap<T, std::unique_ptr<char[]>> createFixedHashMap(IteratorTy
             begin,
             end,
             [](size_t bytes){ return std::unique_ptr<char[]>(new char[bytes]); }
+        )
+    );
+}
+
+template<typename T, uint32_t maxStackProtection=4096, typename IteratorType=void>
+constexpr FixedHashMap<T, std::unique_ptr<char[]>> createEmptyFixedHashMap(IteratorType begin,
+                                                                            IteratorType end,
+                                                                            const T& defaultValue = {})
+{
+    fhmbuilding::DefaultValueAdapter<T> adapter { defaultValue };
+    return std::move(
+        createFixedHashMap<T, maxStackProtection>(
+            begin,
+            end,
+            [](size_t bytes){ return std::unique_ptr<char[]>(new char[bytes]); },
+            adapter
         )
     );
 }
