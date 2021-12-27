@@ -272,11 +272,11 @@ CONSTEXPRINLINE bool validateTypeInConstexpr()
 {
     if(IS_CONSTANT_EVALUATED())
     {
-        // Guard to prevent the static_asset from getting evaluated when it shouldn't be!
         if constexpr(!supported_copy_with_constexpr<T>::value)
         {
-            static_assert(supported_copy_with_constexpr<T>::value,
-                          "This type cannot be converted in a constexpr context, this is likely due to implicit padding.");
+           // Using a static_assert will often evaluate prematurely, so we opt to throw an exception here
+            // in its place (which can only happen at compile time).
+            throw "This type cannot be converted in a constexpr context, this is likely due to implicit padding.";
         }
         return false;
     }
@@ -327,6 +327,19 @@ CONSTEXPRINLINE T loadObject(Byte* data)
     T output;
     loadObject(data, output);
     return output;
+}
+
+template<size_t size, typename Byte>
+CONSTEXPRINLINE void copyBytes(Byte* dst, const Byte* src)
+{
+    if(IS_CONSTANT_EVALUATED())
+    {
+        for(size_t i=0 ; i<size; ++i) { dst[i] = src[i]; }
+    }
+    else
+    {
+        std::memcpy(dst, src, size);
+    }
 }
 
 template<typename T, typename Byte>
@@ -398,11 +411,15 @@ CONSTEXPRINLINE uint64_t byteSize(Byte* root)
 
 // Main routine that deals with finding a key, so a value may subsequently
 // be fetched or stored
-template<bool setting, typename Value, typename Byte>
+// mode 0 = get
+// mode 1 = set
+// mode 2 = swap
+template<int mode, typename Value, typename Byte>
 CONSTEXPRINLINE bool getSetImpl(Byte* root,
                                 const uint64_t hash,
                                 Value& inputOutput)
 {
+    constexpr bool setting = mode >= 1;
     static_assert(!(setting && std::is_const_v<Byte>), "Cannot set a value, on a non-writeable map!");
     if(!detail::validateTypeInConstexpr<Value>()) { return false; }
     Byte* data = root;
@@ -433,11 +450,24 @@ CONSTEXPRINLINE bool getSetImpl(Byte* root,
     // Get or set the value depending on what op we're doing
     if constexpr(setting)
     {
-        storeObject(data, inputOutput);
+        // Swap
+        if constexpr (mode == 2)
+        {
+            Byte tmp[sizeof(Value)] {};
+            storeObject(tmp, inputOutput);
+            loadObject(data, inputOutput);
+            copyBytes<sizeof(Value)>(data, &tmp[0]);
+        }
+
+        // Set
+        else
+        {
+            storeObject(data, inputOutput);
+        }
     }
     else
     {
-        loadObject(data, inputOutput);            
+        loadObject(data, inputOutput);
     }
 
     return true;
@@ -631,14 +661,20 @@ struct FixedHashMap
 
     // Only enable setting if the storage pointer isn't read only
     template<typename Dummy=void, typename=std::enable_if_t<std::is_same_v<Dummy, void> && !readOnly>>
+    CONSTEXPRINLINE bool swap(const uint64_t key, Value& input)
+    {
+        return fhmio::getSetImpl<2>( &storage[0], key, input );
+    }
+
+    template<typename Dummy=void, typename=std::enable_if_t<std::is_same_v<Dummy, void> && !readOnly>>
     CONSTEXPRINLINE bool set(const uint64_t key, const Value& input)
     {
-        return fhmio::getSetImpl<true>( &storage[0], key, input );
+        return fhmio::getSetImpl<1>( &storage[0], key, input );
     }
 
     CONSTEXPRINLINE bool get(const uint64_t key, Value& output) const
     {
-        return fhmio::getSetImpl<false>( &storage[0], key, output );
+        return fhmio::getSetImpl<0>( &storage[0], key, output );
     }
 
     CONSTEXPRINLINE bool hasKey(const uint64_t key) const
