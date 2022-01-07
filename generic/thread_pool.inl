@@ -30,6 +30,7 @@
 #include <ctime>
 #include <mutex>
 #include <functional>
+#include <chrono>
 #include <shared_mutex>
 #include <memory>
 #include <thread>
@@ -37,6 +38,10 @@
 #include <set>
 #include <utility>
 #include <condition_variable>
+
+
+// Useful for debugging when you want break-all
+#define THREAD_POOL_ENABLE_WAIT_COUNTERS 0
 
 
 using taskhandle_t = size_t;
@@ -370,27 +375,42 @@ private:
         template<typename Predicate>
         void wait(Predicate&& readyPredicate)
         {
-            if(!readyPredicate())
+            while(!readyPredicate())
             {
+#if THREAD_POOL_ENABLE_WAIT_COUNTERS
                 ++m_waitCount;
+#endif
                 std::unique_lock<std::mutex> lock(m_lock);
-                m_cv.wait(lock, std::forward<Predicate>(readyPredicate));
+                m_cv.wait_for(
+                    lock,
+                    std::chrono::microseconds(1),
+                    std::forward<Predicate>(readyPredicate)
+                );
+#if THREAD_POOL_ENABLE_WAIT_COUNTERS
                 --m_waitCount;
+#endif
             }
         }
 
         void wait()
         {
+#if THREAD_POOL_ENABLE_WAIT_COUNTERS
             ++m_waitCount;
+#endif
             std::unique_lock<std::mutex> lock(m_lock);
             m_cv.wait(lock);
+#if THREAD_POOL_ENABLE_WAIT_COUNTERS
             --m_waitCount; 
+#endif
         }
 
-        void wakeOne(void) { if(m_waitCount > 0) { m_cv.notify_one(); } }
-        void wakeAll(void) { if(m_waitCount > 0) { m_cv.notify_all(); } }
+        void wakeOne(void) { m_cv.notify_one(); }
+        void wakeAll(void) { m_cv.notify_all(); }
 
+#if THREAD_POOL_ENABLE_WAIT_COUNTERS
         std::atomic<uint32_t>   m_waitCount { 0 };
+#endif
+
         std::mutex              m_lock;
         std::condition_variable m_cv;
     };
