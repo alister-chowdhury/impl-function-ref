@@ -426,17 +426,10 @@ CONSTEXPRINLINE uint64_t byteSize(Byte* root)
 
 // Main routine that deals with finding a key, so a value may subsequently
 // be fetched or stored
-// mode 0 = get
-// mode 1 = set
-// mode 2 = swap
-template<int mode, typename Value, typename Byte>
-CONSTEXPRINLINE bool getSetImpl(Byte* root,
-                                const uint64_t hash,
-                                Value& inputOutput)
+template<typename Value, typename Byte>
+CONSTEXPRINLINE Byte* getAddressImpl(Byte* root, const uint64_t hash)
 {
-    constexpr bool setting = mode >= 1;
-    static_assert(!(setting && std::is_const_v<Byte>), "Cannot set a value, on a non-writeable map!");
-    if(!detail::validateTypeInConstexpr<Value>()) { return false; }
+    if(!detail::validateTypeInConstexpr<Value>()) { return 0; }
     Byte* data = root;
 
     const FhmMapHeader mapHeader = streamInObject<FhmMapHeader>(data);
@@ -455,12 +448,31 @@ CONSTEXPRINLINE bool getSetImpl(Byte* root,
     // Assume that generally people aren't using this to test if a key exists
     IF_UNLIKELY(keyId >= header.count)
     {
-        return false;
+        return 0;
     }
 
     // Go to the data block
     data += (header.count - keyId - 1) * sizeof(FhmBucketHeader)
          + sizeof(Value) * keyId;
+
+    return data;
+}
+
+
+// mode 0 = get
+// mode 1 = set
+// mode 2 = swap
+template<int mode, typename Value, typename Byte>
+CONSTEXPRINLINE bool getSetImpl(Byte* root,
+                                const uint64_t hash,
+                                Value& inputOutput)
+{
+    constexpr bool setting = mode >= 1;
+    static_assert(!(setting && std::is_const_v<Byte>), "Cannot set a value, on a non-writeable map!");
+    if(!detail::validateTypeInConstexpr<Value>()) { return false; }
+    Byte* data = getAddressImpl<Value, Byte>(root, hash);
+
+    if(!data) { return false; }
 
     // Get or set the value depending on what op we're doing
     if constexpr(setting)
@@ -503,6 +515,11 @@ struct NodeItIndirection
     CONSTEXPRINLINE operator T () const
     {
         return fhmio::loadObject<T>(offset);
+    }
+
+    FORCEINLINE const T* getPtr() const
+    {
+        return (const T*)offset;
     }
 
     template<typename=std::enable_if_t<!readOnly>>
@@ -690,6 +707,18 @@ struct FixedHashMap
     CONSTEXPRINLINE bool get(const uint64_t key, Value& output) const
     {
         return fhmio::getSetImpl<0>( &storage[0], key, output );
+    }
+
+    // NB: Cannot be constexpr due to casting
+    template<typename Dummy=void, typename=std::enable_if_t<std::is_same_v<Dummy, void> && !readOnly>>
+    FORCEINLINE Value* getRawPtr(const uint64_t key)
+    {
+        return (Value*)fhmio::getAddressImpl<Value>( &storage[0], key );
+    }
+
+    FORCEINLINE const Value* getRawPtr(const uint64_t key) const
+    {
+        return (const  Value*)fhmio::getAddressImpl<Value>( &storage[0], key );
     }
 
     CONSTEXPRINLINE bool hasKey(const uint64_t key) const
