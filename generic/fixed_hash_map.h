@@ -927,6 +927,14 @@ CONSTEXPRINLINE FixedHashMap<T, fhmbuilding::TypedFixedStorage<T, itemCount>> cr
     );
 }
 
+
+template<typename T>
+CONSTEXPRINLINE FixedHashMap<T, fhmbuilding::TypedFixedStorage<T, 0>> createFixedHashMap()
+{
+    return createEmptyFixedHashMapFromHashes<T>();
+}
+
+
 // Runtime specific hash-map generation, where a fixed data size cannot be used
 template<typename T, uint32_t maxStackProtection=4096, typename Adapter=fhmbuilding::DefaultMapAdapter, typename IteratorType=void, typename AllocateFuncType=void>
 CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, AllocateFuncType&& allocateFunc, Adapter adapter={})
