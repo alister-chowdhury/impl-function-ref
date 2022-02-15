@@ -709,6 +709,11 @@ struct FixedHashMap
         return fhmio::getSetImpl<0>( &storage[0], key, output );
     }
 
+    CONSTEXPRINLINE u64 getRawOffset(const uint64_t key) const
+    {
+        return (fhmio::getAddressImpl<Value>( &storage[0], key ) - (&storage[0]));
+    }
+
     // NB: Cannot be constexpr due to casting
     template<typename Dummy=void, typename=std::enable_if_t<std::is_same_v<Dummy, void> && !readOnly>>
     FORCEINLINE Value* getRawPtr(const uint64_t key)
