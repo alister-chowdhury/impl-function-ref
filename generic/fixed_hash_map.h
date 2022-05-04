@@ -709,7 +709,7 @@ struct FixedHashMap
         return fhmio::getSetImpl<0>( &storage[0], key, output );
     }
 
-    CONSTEXPRINLINE u64 getRawOffset(const uint64_t key) const
+    CONSTEXPRINLINE uint64_t getRawOffset(const uint64_t key) const
     {
         return (fhmio::getAddressImpl<Value>( &storage[0], key ) - (&storage[0]));
     }
