@@ -958,6 +958,17 @@ CONSTEXPRINLINE auto createFixedHashMap(IteratorType begin, IteratorType end, Al
     mapHeader.bucketCount = bucketCount;
     fhmio::storeObject(&result.storage[0], mapHeader);
 
+    // Ensure all buckets are empty
+    for(uint32_t bucketId = 0; bucketId < bucketCount; ++bucketId)
+    {
+        constexpr FhmBucketHeader emptyHeader{};
+        Byte* bucketOffset = &result.storage[
+            sizeof(FhmMapHeader)
+                + sizeof(FhmBucketHeader) * bucketId
+        ];
+        fhmio::storeObject(bucketOffset, emptyHeader);
+    }
+
     // We're going to use the allocated storage as scratch space
     // this the number of buckets isn't static, and dynamic allocation
     // is a bit sad.
