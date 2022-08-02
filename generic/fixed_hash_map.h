@@ -679,7 +679,7 @@ struct FixedHashMap
     static_assert(!std::is_volatile_v<T>, "Value type cannot be volatile!");
 
     // Long-winded way to get the char type while removing references etc
-    using RawAccessType = decltype(std::declval<Storage>()[0]);
+    using RawAccessType = std::remove_reference_t<decltype(std::declval<Storage>()[0])>;
     const static bool readOnly = std::is_const_v<RawAccessType>;
 
     using CharType = std::conditional_t<readOnly, const std::decay_t<RawAccessType>, std::decay_t<RawAccessType>>;
@@ -781,7 +781,7 @@ struct FixedHashMap
         return { &storage[0] };
     }
 
-    Storage storage;
+    Storage storage {};
 };
 
 
