@@ -61,6 +61,19 @@ CONSTEXPRINLINE uint32_t f32ToU8(float y)
 }
 
 
+// Also better for cpus
+CONSTEXPRINLINE uint8_t f32ToU8v2(float x)
+{
+    // 1x mad
+    // 1x and
+    float y0 = std::bit_cast<float>(0x37ff0000u);
+    float y1 = std::bit_cast<float>(0x3f800000u);
+    x = y0 * x + y1;
+    return (std::bit_cast<uint32_t>(x)) & 0xffu;
+}
+
+
+
 CONSTEXPRINLINE float u16ToF32(uint32_t y)
 {
     // 1x shift_add
@@ -68,6 +81,25 @@ CONSTEXPRINLINE float u16ToF32(uint32_t y)
     y = 0x3f800000u + (y << 7);
     float x = 65536.0f/65535.0f * std::bit_cast<float>(y) - 65536.0f/65535.0f;
     return x;
+}
+
+
+CONSTEXPRINLINE uint8_t u8Lerp(uint8_t a, uint8_t b, float x)
+{
+    float af = std::bit_cast<float>(0x3f800000u + (uint32_t(a) << 1));
+    float bf = std::bit_cast<float>(0x3f800000u + (uint32_t(b) << 1));
+    float cf = af + (bf - af) * x;
+    return uint8_t(std::bit_cast<uint32_t>(cf) >> 1);
+}
+
+
+// Does not always round correctly
+CONSTEXPRINLINE uint8_t u8LerpFast(uint8_t a, uint8_t b, float x)
+{
+    float af = std::bit_cast<float>(0x3f800000u + (uint32_t(a)));
+    float bf = std::bit_cast<float>(0x3f800000u + (uint32_t(b)));
+    float cf = af + (bf - af) * x;
+    return uint8_t(std::bit_cast<uint32_t>(cf));
 }
 
 
